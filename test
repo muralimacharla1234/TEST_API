@@ -1,0 +1,1066 @@
+CREATE TYPE Cust_Address_Type AS OBJECT (
+ street_address VARCHAR2(40),
+ postal_code VARCHAR2(10),
+ city VARCHAR2(30),
+ state_province VARCHAR2(10),
+ country_id CHAR(2)
+);
+CREATE TYPE Price_Type AS OBJECT (
+ price NUMBER(10,2)
+);
+
+CREATE TABLE Medium
+(
+	medium_id            Integer  NOT NULL ,
+	medium_type          Varchar2(20 BYTE)  NULL 
+);
+
+CREATE UNIQUE INDEX pk_T_MEDIUM ON Medium
+(medium_id   ASC);
+
+ALTER TABLE Medium
+	ADD CONSTRAINT  pk_T_MEDIUM PRIMARY KEY (medium_id);
+
+CREATE TABLE Exemplar
+(
+	exemplar_id          Integer  NOT NULL ,
+	film_id              Integer  NOT NULL ,
+	medium_id            Integer  NOT NULL ,
+	price_per_day        Integer  NOT NULL 
+);
+
+CREATE UNIQUE INDEX pk_T_EXEMPLAR ON Exemplar
+(exemplar_id   ASC);
+
+ALTER TABLE Exemplar
+	ADD CONSTRAINT  pk_T_EXEMPLAR PRIMARY KEY (exemplar_id);
+
+CREATE UNIQUE INDEX ak_exemplar_ppd ON Exemplar
+(exemplar_id   ASC,price_per_day   ASC);
+
+ALTER TABLE Exemplar
+ADD 
+CONSTRAINT  ak_exemplar_ppd UNIQUE (exemplar_id,price_per_day);
+
+CREATE TABLE Borrowing
+(
+	exemplar_id          Integer  NOT NULL ,
+	customer_id          Integer  NOT NULL ,
+	start_date           Date  NULL ,
+	end_date             Date  NULL ,
+	total_price          CHAR(18)  NULL ,
+	VAT                  Number(4,2)  NULL ,
+CONSTRAINT check_end_after_start CHECK ( (end_date>start_date) or (end_date is null) )
+);
+
+CREATE UNIQUE INDEX pk_T_BORROWING ON Borrowing
+(exemplar_id   ASC);
+
+ALTER TABLE Borrowing
+	ADD CONSTRAINT  pk_T_BORROWING PRIMARY KEY (exemplar_id);
+
+CREATE TABLE Customer
+(
+	customer_id          Integer  NOT NULL ,
+	name                 Varchar2(20 CHAR)  NULL ,
+	address              CHAR(18)  NULL 
+);
+
+CREATE UNIQUE INDEX pk_T_CUSTOMER ON Customer
+(customer_id   ASC);
+
+ALTER TABLE Customer
+	ADD CONSTRAINT  pk_T_CUSTOMER PRIMARY KEY (customer_id);
+
+CREATE TABLE Genre
+(
+	genre_id             Integer  NOT NULL ,
+	name                 Varchar2(20 CHAR)  NULL 
+);
+
+CREATE UNIQUE INDEX pk_T_GENRE ON Genre
+(genre_id   ASC);
+
+ALTER TABLE Genre
+	ADD CONSTRAINT  pk_T_GENRE PRIMARY KEY (genre_id);
+
+CREATE TABLE Film
+(
+	film_id              Integer  NOT NULL ,
+	title                Varchar2(50 CHAR)  NOT NULL ,
+	director             Varchar2(30 CHAR)  NOT NULL ,
+	production_company   Varchar2(50 CHAR)  NULL ,
+	genre_id             Integer  NOT NULL ,
+	min_age              Integer  NULL ,
+	film_ID_episodes     Integer  NULL 
+);
+
+CREATE UNIQUE INDEX pk_T_FILM ON Film
+(film_id   ASC);
+
+ALTER TABLE Film
+	ADD CONSTRAINT  pk_T_FILM PRIMARY KEY (film_id);
+
+CREATE UNIQUE INDEX ak_title_director ON Film
+(title   ASC,director   ASC);
+
+ALTER TABLE Film
+ADD 
+CONSTRAINT  ak_title_director UNIQUE (title,director);
+
+CREATE TABLE Order_Record
+(
+	customer_id          Integer  NOT NULL ,
+	film_id              Integer  NOT NULL ,
+	order_date           Date  NULL 
+);
+
+CREATE UNIQUE INDEX pk_T_ORDER_RECORD ON Order_Record
+(customer_id   ASC,film_id   ASC);
+
+ALTER TABLE Order_Record
+	ADD CONSTRAINT  pk_T_ORDER_RECORD PRIMARY KEY (customer_id,film_id);
+
+CREATE TABLE Customer_Rating
+(
+	title                Varchar2(50 CHAR)  NOT NULL ,
+	director             Varchar2(30 CHAR)  NOT NULL ,
+	rating               Integer  NULL  CONSTRAINT  check_rating CHECK (rating > 0),
+	film_id              Integer  NOT NULL 
+);
+
+CREATE UNIQUE INDEX pk_T_CUSTOMER_RATING ON Customer_Rating
+(title   ASC,director   ASC,film_id   ASC);
+
+ALTER TABLE Customer_Rating
+	ADD CONSTRAINT  pk_T_CUSTOMER_RATING PRIMARY KEY (title,director,film_id);
+
+AS /*select_statement*/\n;
+
+ALTER TABLE Exemplar
+	ADD (
+CONSTRAINT is_available_on FOREIGN KEY (medium_id) REFERENCES Medium (medium_id)  NOT DEFERRABLE  INITIALLY IMMEDIATE  RELY  DISABLE  VALIDATE);
+
+ALTER TABLE Exemplar
+	ADD (
+CONSTRAINT has FOREIGN KEY (film_id) REFERENCES Film (film_id)  NOT DEFERRABLE  INITIALLY IMMEDIATE  RELY  DISABLE  VALIDATE);
+
+ALTER TABLE Borrowing
+	ADD (
+CONSTRAINT is_related_to FOREIGN KEY (exemplar_id) REFERENCES Exemplar (exemplar_id)  NOT DEFERRABLE  INITIALLY IMMEDIATE  RELY  DISABLE  VALIDATE);
+
+ALTER TABLE Borrowing
+	ADD (
+CONSTRAINT makes FOREIGN KEY (customer_id) REFERENCES Customer (customer_id)  NOT DEFERRABLE  INITIALLY IMMEDIATE  RELY  DISABLE  VALIDATE);
+
+ALTER TABLE Film
+	ADD (
+CONSTRAINT has_more_episodes FOREIGN KEY (film_id) REFERENCES Film (film_id)  NOT DEFERRABLE  INITIALLY IMMEDIATE  RELY  DISABLE  VALIDATE);
+
+ALTER TABLE Film
+	ADD (
+CONSTRAINT is_of FOREIGN KEY (genre_id) REFERENCES Genre (genre_id)  NOT DEFERRABLE  INITIALLY IMMEDIATE  RELY  DISABLE  VALIDATE);
+
+ALTER TABLE Order_Record
+	ADD (
+CONSTRAINT is_required_by FOREIGN KEY (film_id) REFERENCES Film (film_id)  NOT DEFERRABLE  INITIALLY IMMEDIATE  RELY  DISABLE  VALIDATE);
+
+ALTER TABLE Order_Record
+	ADD (
+CONSTRAINT places FOREIGN KEY (customer_id) REFERENCES Customer (customer_id)  NOT DEFERRABLE  INITIALLY IMMEDIATE  RELY  DISABLE  VALIDATE);
+
+ALTER TABLE Customer_Rating
+	ADD (
+CONSTRAINT is_rated FOREIGN KEY (film_id) REFERENCES Film (film_id)  NOT DEFERRABLE  INITIALLY IMMEDIATE  RELY  DISABLE  VALIDATE);
+
+AS BEGIN     SELECT count(*)     INTO num     FROM T_CUSTOMER c, T_BORROWING b, T_EXEMPLAR e, T_FILM f     WHERE c.customer_id=cid         and c.customer_id=b.customer_id         and b.exemplar_id=e.exemplar_id         and e.film_id=f.film_id; END;
+/
+
+
+
+IS sol integer; BEGIN     p_Customer_Has_Num_Film(cid,sol);     RETURN (sol); END;
+/
+
+
+
+CREATE  TRIGGER  tD_Medium AFTER DELETE ON Medium for each row
+-- erwin Builtin Trigger
+-- DELETE trigger on Medium 
+DECLARE NUMROWS INTEGER;
+BEGIN
+    /* erwin Builtin Trigger */
+    /* Medium  Exemplar on parent delete no action */
+    /* ERWIN_RELATION:CHECKSUM="0000e284", PARENT_OWNER="", PARENT_TABLE="Medium"
+    CHILD_OWNER="", CHILD_TABLE="Exemplar"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_available_on", FK_COLUMNS="medium_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Exemplar
+      WHERE
+        /*  %JoinFKPK(Exemplar,:%Old," = "," AND") */
+        Exemplar.medium_id = :old.medium_id;
+    IF (NUMROWS > 0)
+    THEN
+      raise_application_error(
+        -20001,
+        'Cannot DELETE Medium because Exemplar exists.'
+      );
+    END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+CREATE  TRIGGER tU_Medium AFTER UPDATE ON Medium for each row
+-- erwin Builtin Trigger
+-- UPDATE trigger on Medium 
+DECLARE NUMROWS INTEGER;
+BEGIN
+  /* erwin Builtin Trigger */
+  /* Medium  Exemplar on parent update no action */
+  /* ERWIN_RELATION:CHECKSUM="00010730", PARENT_OWNER="", PARENT_TABLE="Medium"
+    CHILD_OWNER="", CHILD_TABLE="Exemplar"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_available_on", FK_COLUMNS="medium_id" */
+  IF
+    /* %JoinPKPK(:%Old,:%New," <> "," OR ") */
+    :old.medium_id <> :new.medium_id
+  THEN
+    SELECT count(*) INTO NUMROWS
+      FROM Exemplar
+      WHERE
+        /*  %JoinFKPK(Exemplar,:%Old," = "," AND") */
+        Exemplar.medium_id = :old.medium_id;
+    IF (NUMROWS > 0)
+    THEN 
+      raise_application_error(
+        -20005,
+        'Cannot update Medium because Exemplar exists.'
+      );
+    END IF;
+  END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+
+CREATE  TRIGGER  tD_Exemplar AFTER DELETE ON Exemplar for each row
+-- erwin Builtin Trigger
+-- DELETE trigger on Exemplar 
+DECLARE NUMROWS INTEGER;
+BEGIN
+    /* erwin Builtin Trigger */
+    /* Exemplar  Borrowing on parent delete no action */
+    /* ERWIN_RELATION:CHECKSUM="0000e50d", PARENT_OWNER="", PARENT_TABLE="Exemplar"
+    CHILD_OWNER="", CHILD_TABLE="Borrowing"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_related_to", FK_COLUMNS="exemplar_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Borrowing
+      WHERE
+        /*  %JoinFKPK(Borrowing,:%Old," = "," AND") */
+        Borrowing.exemplar_id = :old.exemplar_id;
+    IF (NUMROWS > 0)
+    THEN
+      raise_application_error(
+        -20001,
+        'Cannot DELETE Exemplar because Borrowing exists.'
+      );
+    END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+CREATE  TRIGGER tI_Exemplar BEFORE INSERT ON Exemplar for each row
+-- erwin Builtin Trigger
+-- INSERT trigger on Exemplar 
+DECLARE NUMROWS INTEGER;
+BEGIN
+    /* erwin Builtin Trigger */
+    /* Film  Exemplar on child insert set null */
+    /* ERWIN_RELATION:CHECKSUM="0001dfbf", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Exemplar"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="has", FK_COLUMNS="film_id" */
+    UPDATE Exemplar
+      SET
+        /* %SetFK(Exemplar,NULL) */
+        Exemplar.film_id = NULL
+      WHERE
+        NOT EXISTS (
+          SELECT * FROM Film
+            WHERE
+              /* %JoinFKPK(:%New,Film," = "," AND") */
+              :new.film_id = Film.film_id
+        ) 
+        /* %JoinPKPK(Exemplar,:%New," = "," AND") */
+         and Exemplar.exemplar_id = :new.exemplar_id;
+
+    /* erwin Builtin Trigger */
+    /* Medium  Exemplar on child insert set null */
+    /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Medium"
+    CHILD_OWNER="", CHILD_TABLE="Exemplar"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_available_on", FK_COLUMNS="medium_id" */
+    UPDATE Exemplar
+      SET
+        /* %SetFK(Exemplar,NULL) */
+        Exemplar.medium_id = NULL
+      WHERE
+        NOT EXISTS (
+          SELECT * FROM Medium
+            WHERE
+              /* %JoinFKPK(:%New,Medium," = "," AND") */
+              :new.medium_id = Medium.medium_id
+        ) 
+        /* %JoinPKPK(Exemplar,:%New," = "," AND") */
+         and Exemplar.exemplar_id = :new.exemplar_id;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+CREATE  TRIGGER tU_Exemplar AFTER UPDATE ON Exemplar for each row
+-- erwin Builtin Trigger
+-- UPDATE trigger on Exemplar 
+DECLARE NUMROWS INTEGER;
+BEGIN
+  /* erwin Builtin Trigger */
+  /* Exemplar  Borrowing on parent update no action */
+  /* ERWIN_RELATION:CHECKSUM="0003035f", PARENT_OWNER="", PARENT_TABLE="Exemplar"
+    CHILD_OWNER="", CHILD_TABLE="Borrowing"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_related_to", FK_COLUMNS="exemplar_id" */
+  IF
+    /* %JoinPKPK(:%Old,:%New," <> "," OR ") */
+    :old.exemplar_id <> :new.exemplar_id
+  THEN
+    SELECT count(*) INTO NUMROWS
+      FROM Borrowing
+      WHERE
+        /*  %JoinFKPK(Borrowing,:%Old," = "," AND") */
+        Borrowing.exemplar_id = :old.exemplar_id;
+    IF (NUMROWS > 0)
+    THEN 
+      raise_application_error(
+        -20005,
+        'Cannot update Exemplar because Borrowing exists.'
+      );
+    END IF;
+  END IF;
+
+  /* erwin Builtin Trigger */
+  /* Film  Exemplar on child update no action */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Exemplar"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="has", FK_COLUMNS="film_id" */
+  SELECT count(*) INTO NUMROWS
+    FROM Film
+    WHERE
+      /* %JoinFKPK(:%New,Film," = "," AND") */
+      :new.film_id = Film.film_id;
+  IF (
+    /* %NotnullFK(:%New," IS NOT NULL AND") */
+    :new.film_id IS NOT NULL AND
+    NUMROWS = 0
+  )
+  THEN
+    raise_application_error(
+      -20007,
+      'Cannot update Exemplar because Film does not exist.'
+    );
+  END IF;
+
+  /* erwin Builtin Trigger */
+  /* Medium  Exemplar on child update no action */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Medium"
+    CHILD_OWNER="", CHILD_TABLE="Exemplar"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_available_on", FK_COLUMNS="medium_id" */
+  SELECT count(*) INTO NUMROWS
+    FROM Medium
+    WHERE
+      /* %JoinFKPK(:%New,Medium," = "," AND") */
+      :new.medium_id = Medium.medium_id;
+  IF (
+    /* %NotnullFK(:%New," IS NOT NULL AND") */
+    :new.medium_id IS NOT NULL AND
+    NUMROWS = 0
+  )
+  THEN
+    raise_application_error(
+      -20007,
+      'Cannot update Exemplar because Medium does not exist.'
+    );
+  END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+
+CREATE  TRIGGER  tD_Customer AFTER DELETE ON Customer for each row
+-- erwin Builtin Trigger
+-- DELETE trigger on Customer 
+DECLARE NUMROWS INTEGER;
+BEGIN
+    /* erwin Builtin Trigger */
+    /* Customer  Borrowing on parent delete no action */
+    /* ERWIN_RELATION:CHECKSUM="0001e343", PARENT_OWNER="", PARENT_TABLE="Customer"
+    CHILD_OWNER="", CHILD_TABLE="Borrowing"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="makes", FK_COLUMNS="customer_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Borrowing
+      WHERE
+        /*  %JoinFKPK(Borrowing,:%Old," = "," AND") */
+        Borrowing.customer_id = :old.customer_id;
+    IF (NUMROWS > 0)
+    THEN
+      raise_application_error(
+        -20001,
+        'Cannot DELETE Customer because Borrowing exists.'
+      );
+    END IF;
+
+    /* erwin Builtin Trigger */
+    /* Customer  Order_Record on parent delete no action */
+    /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Customer"
+    CHILD_OWNER="", CHILD_TABLE="Order_Record"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="places", FK_COLUMNS="customer_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Order_Record
+      WHERE
+        /*  %JoinFKPK(Order_Record,:%Old," = "," AND") */
+        Order_Record.customer_id = :old.customer_id;
+    IF (NUMROWS > 0)
+    THEN
+      raise_application_error(
+        -20001,
+        'Cannot DELETE Customer because Order_Record exists.'
+      );
+    END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+CREATE  TRIGGER tU_Customer AFTER UPDATE ON Customer for each row
+-- erwin Builtin Trigger
+-- UPDATE trigger on Customer 
+DECLARE NUMROWS INTEGER;
+BEGIN
+  /* erwin Builtin Trigger */
+  /* Customer  Borrowing on parent update no action */
+  /* ERWIN_RELATION:CHECKSUM="00022433", PARENT_OWNER="", PARENT_TABLE="Customer"
+    CHILD_OWNER="", CHILD_TABLE="Borrowing"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="makes", FK_COLUMNS="customer_id" */
+  IF
+    /* %JoinPKPK(:%Old,:%New," <> "," OR ") */
+    :old.customer_id <> :new.customer_id
+  THEN
+    SELECT count(*) INTO NUMROWS
+      FROM Borrowing
+      WHERE
+        /*  %JoinFKPK(Borrowing,:%Old," = "," AND") */
+        Borrowing.customer_id = :old.customer_id;
+    IF (NUMROWS > 0)
+    THEN 
+      raise_application_error(
+        -20005,
+        'Cannot update Customer because Borrowing exists.'
+      );
+    END IF;
+  END IF;
+
+  /* erwin Builtin Trigger */
+  /* Customer  Order_Record on parent update no action */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Customer"
+    CHILD_OWNER="", CHILD_TABLE="Order_Record"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="places", FK_COLUMNS="customer_id" */
+  IF
+    /* %JoinPKPK(:%Old,:%New," <> "," OR ") */
+    :old.customer_id <> :new.customer_id
+  THEN
+    SELECT count(*) INTO NUMROWS
+      FROM Order_Record
+      WHERE
+        /*  %JoinFKPK(Order_Record,:%Old," = "," AND") */
+        Order_Record.customer_id = :old.customer_id;
+    IF (NUMROWS > 0)
+    THEN 
+      raise_application_error(
+        -20005,
+        'Cannot update Customer because Order_Record exists.'
+      );
+    END IF;
+  END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+
+CREATE  TRIGGER  tD_Genre AFTER DELETE ON Genre for each row
+-- erwin Builtin Trigger
+-- DELETE trigger on Genre 
+DECLARE NUMROWS INTEGER;
+BEGIN
+    /* erwin Builtin Trigger */
+    /* Genre  Film on parent delete no action */
+    /* ERWIN_RELATION:CHECKSUM="0000cc59", PARENT_OWNER="", PARENT_TABLE="Genre"
+    CHILD_OWNER="", CHILD_TABLE="Film"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_of", FK_COLUMNS="genre_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Film
+      WHERE
+        /*  %JoinFKPK(Film,:%Old," = "," AND") */
+        Film.genre_id = :old.genre_id;
+    IF (NUMROWS > 0)
+    THEN
+      raise_application_error(
+        -20001,
+        'Cannot DELETE Genre because Film exists.'
+      );
+    END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+CREATE  TRIGGER tU_Genre AFTER UPDATE ON Genre for each row
+-- erwin Builtin Trigger
+-- UPDATE trigger on Genre 
+DECLARE NUMROWS INTEGER;
+BEGIN
+  /* erwin Builtin Trigger */
+  /* Genre  Film on parent update no action */
+  /* ERWIN_RELATION:CHECKSUM="0000f404", PARENT_OWNER="", PARENT_TABLE="Genre"
+    CHILD_OWNER="", CHILD_TABLE="Film"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_of", FK_COLUMNS="genre_id" */
+  IF
+    /* %JoinPKPK(:%Old,:%New," <> "," OR ") */
+    :old.genre_id <> :new.genre_id
+  THEN
+    SELECT count(*) INTO NUMROWS
+      FROM Film
+      WHERE
+        /*  %JoinFKPK(Film,:%Old," = "," AND") */
+        Film.genre_id = :old.genre_id;
+    IF (NUMROWS > 0)
+    THEN 
+      raise_application_error(
+        -20005,
+        'Cannot update Genre because Film exists.'
+      );
+    END IF;
+  END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+
+CREATE  TRIGGER  tD_Film AFTER DELETE ON Film for each row
+-- erwin Builtin Trigger
+-- DELETE trigger on Film 
+DECLARE NUMROWS INTEGER;
+BEGIN
+    /* erwin Builtin Trigger */
+    /* Film  Exemplar on parent delete no action */
+    /* ERWIN_RELATION:CHECKSUM="0003992c", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Exemplar"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="has", FK_COLUMNS="film_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Exemplar
+      WHERE
+        /*  %JoinFKPK(Exemplar,:%Old," = "," AND") */
+        Exemplar.film_id = :old.film_id;
+    IF (NUMROWS > 0)
+    THEN
+      raise_application_error(
+        -20001,
+        'Cannot DELETE Film because Exemplar exists.'
+      );
+    END IF;
+
+    /* erwin Builtin Trigger */
+    /* Film  Film on parent delete no action */
+    /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Film"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="has_more_episodes", FK_COLUMNS="film_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Film
+      WHERE
+        /*  %JoinFKPK(Film,:%Old," = "," AND") */
+        Film.film_id = :old.film_id;
+    IF (NUMROWS > 0)
+    THEN
+      raise_application_error(
+        -20001,
+        'Cannot DELETE Film because Film exists.'
+      );
+    END IF;
+
+    /* erwin Builtin Trigger */
+    /* Film  Customer_Rating on parent delete no action */
+    /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Customer_Rating"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_rated", FK_COLUMNS="film_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Customer_Rating
+      WHERE
+        /*  %JoinFKPK(Customer_Rating,:%Old," = "," AND") */
+        Customer_Rating.film_id = :old.film_id;
+    IF (NUMROWS > 0)
+    THEN
+      raise_application_error(
+        -20001,
+        'Cannot DELETE Film because Customer_Rating exists.'
+      );
+    END IF;
+
+    /* erwin Builtin Trigger */
+    /* Film  Order_Record on parent delete no action */
+    /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Order_Record"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_required_by", FK_COLUMNS="film_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Order_Record
+      WHERE
+        /*  %JoinFKPK(Order_Record,:%Old," = "," AND") */
+        Order_Record.film_id = :old.film_id;
+    IF (NUMROWS > 0)
+    THEN
+      raise_application_error(
+        -20001,
+        'Cannot DELETE Film because Order_Record exists.'
+      );
+    END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+CREATE  TRIGGER tI_Film BEFORE INSERT ON Film for each row
+-- erwin Builtin Trigger
+-- INSERT trigger on Film 
+DECLARE NUMROWS INTEGER;
+BEGIN
+    /* erwin Builtin Trigger */
+    /* Genre  Film on child insert set null */
+    /* ERWIN_RELATION:CHECKSUM="0001c343", PARENT_OWNER="", PARENT_TABLE="Genre"
+    CHILD_OWNER="", CHILD_TABLE="Film"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_of", FK_COLUMNS="genre_id" */
+    UPDATE Film
+      SET
+        /* %SetFK(Film,NULL) */
+        Film.genre_id = NULL
+      WHERE
+        NOT EXISTS (
+          SELECT * FROM Genre
+            WHERE
+              /* %JoinFKPK(:%New,Genre," = "," AND") */
+              :new.genre_id = Genre.genre_id
+        ) 
+        /* %JoinPKPK(Film,:%New," = "," AND") */
+         and Film.film_id = :new.film_id;
+
+    /* erwin Builtin Trigger */
+    /* Film  Film on child insert set null */
+    /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Film"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="has_more_episodes", FK_COLUMNS="film_id" */
+    UPDATE Film
+      SET
+        /* %SetFK(Film,NULL) */
+        Film.film_id = NULL
+      WHERE
+        NOT EXISTS (
+          SELECT * FROM Film
+            WHERE
+              /* %JoinFKPK(:%New,Film," = "," AND") */
+              :new.film_id = Film.film_id
+        ) 
+        /* %JoinPKPK(Film,:%New," = "," AND") */
+         and Film.film_id = :new.film_id;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+CREATE  TRIGGER tU_Film AFTER UPDATE ON Film for each row
+-- erwin Builtin Trigger
+-- UPDATE trigger on Film 
+DECLARE NUMROWS INTEGER;
+BEGIN
+  /* erwin Builtin Trigger */
+  /* Film  Exemplar on parent update no action */
+  /* ERWIN_RELATION:CHECKSUM="00061f38", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Exemplar"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="has", FK_COLUMNS="film_id" */
+  IF
+    /* %JoinPKPK(:%Old,:%New," <> "," OR ") */
+    :old.film_id <> :new.film_id
+  THEN
+    SELECT count(*) INTO NUMROWS
+      FROM Exemplar
+      WHERE
+        /*  %JoinFKPK(Exemplar,:%Old," = "," AND") */
+        Exemplar.film_id = :old.film_id;
+    IF (NUMROWS > 0)
+    THEN 
+      raise_application_error(
+        -20005,
+        'Cannot update Film because Exemplar exists.'
+      );
+    END IF;
+  END IF;
+
+  /* erwin Builtin Trigger */
+  /* Film  Film on parent update no action */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Film"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="has_more_episodes", FK_COLUMNS="film_id" */
+  IF
+    /* %JoinPKPK(:%Old,:%New," <> "," OR ") */
+    :old.film_id <> :new.film_id
+  THEN
+    SELECT count(*) INTO NUMROWS
+      FROM Film
+      WHERE
+        /*  %JoinFKPK(Film,:%Old," = "," AND") */
+        Film.film_id = :old.film_id;
+    IF (NUMROWS > 0)
+    THEN 
+      raise_application_error(
+        -20005,
+        'Cannot update Film because Film exists.'
+      );
+    END IF;
+  END IF;
+
+  /* erwin Builtin Trigger */
+  /* Film  Customer_Rating on parent update no action */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Customer_Rating"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_rated", FK_COLUMNS="film_id" */
+  IF
+    /* %JoinPKPK(:%Old,:%New," <> "," OR ") */
+    :old.film_id <> :new.film_id
+  THEN
+    SELECT count(*) INTO NUMROWS
+      FROM Customer_Rating
+      WHERE
+        /*  %JoinFKPK(Customer_Rating,:%Old," = "," AND") */
+        Customer_Rating.film_id = :old.film_id;
+    IF (NUMROWS > 0)
+    THEN 
+      raise_application_error(
+        -20005,
+        'Cannot update Film because Customer_Rating exists.'
+      );
+    END IF;
+  END IF;
+
+  /* erwin Builtin Trigger */
+  /* Film  Order_Record on parent update no action */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Order_Record"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_required_by", FK_COLUMNS="film_id" */
+  IF
+    /* %JoinPKPK(:%Old,:%New," <> "," OR ") */
+    :old.film_id <> :new.film_id
+  THEN
+    SELECT count(*) INTO NUMROWS
+      FROM Order_Record
+      WHERE
+        /*  %JoinFKPK(Order_Record,:%Old," = "," AND") */
+        Order_Record.film_id = :old.film_id;
+    IF (NUMROWS > 0)
+    THEN 
+      raise_application_error(
+        -20005,
+        'Cannot update Film because Order_Record exists.'
+      );
+    END IF;
+  END IF;
+
+  /* erwin Builtin Trigger */
+  /* Genre  Film on child update no action */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Genre"
+    CHILD_OWNER="", CHILD_TABLE="Film"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_of", FK_COLUMNS="genre_id" */
+  SELECT count(*) INTO NUMROWS
+    FROM Genre
+    WHERE
+      /* %JoinFKPK(:%New,Genre," = "," AND") */
+      :new.genre_id = Genre.genre_id;
+  IF (
+    /* %NotnullFK(:%New," IS NOT NULL AND") */
+    :new.genre_id IS NOT NULL AND
+    NUMROWS = 0
+  )
+  THEN
+    raise_application_error(
+      -20007,
+      'Cannot update Film because Genre does not exist.'
+    );
+  END IF;
+
+  /* erwin Builtin Trigger */
+  /* Film  Film on child update no action */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Film"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="has_more_episodes", FK_COLUMNS="film_id" */
+  SELECT count(*) INTO NUMROWS
+    FROM Film
+    WHERE
+      /* %JoinFKPK(:%New,Film," = "," AND") */
+      :new.film_id = Film.film_id;
+  IF (
+    /* %NotnullFK(:%New," IS NOT NULL AND") */
+    :new.film_id IS NOT NULL AND
+    NUMROWS = 0
+  )
+  THEN
+    raise_application_error(
+      -20007,
+      'Cannot update Film because Film does not exist.'
+    );
+  END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+
+CREATE  TRIGGER tI_Order_Record BEFORE INSERT ON Order_Record for each row
+-- erwin Builtin Trigger
+-- INSERT trigger on Order_Record 
+DECLARE NUMROWS INTEGER;
+BEGIN
+    /* erwin Builtin Trigger */
+    /* Customer  Order_Record on child insert restrict */
+    /* ERWIN_RELATION:CHECKSUM="0001ea87", PARENT_OWNER="", PARENT_TABLE="Customer"
+    CHILD_OWNER="", CHILD_TABLE="Order_Record"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="places", FK_COLUMNS="customer_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Customer
+      WHERE
+        /* %JoinFKPK(:%New,Customer," = "," AND") */
+        :new.customer_id = Customer.customer_id;
+    IF (
+      /* %NotnullFK(:%New," IS NOT NULL AND") */
+      
+      NUMROWS = 0
+    )
+    THEN
+      raise_application_error(
+        -20002,
+        'Cannot insert Order_Record because Customer does not exist.'
+      );
+    END IF;
+
+    /* erwin Builtin Trigger */
+    /* Film  Order_Record on child insert restrict */
+    /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Order_Record"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_required_by", FK_COLUMNS="film_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Film
+      WHERE
+        /* %JoinFKPK(:%New,Film," = "," AND") */
+        :new.film_id = Film.film_id;
+    IF (
+      /* %NotnullFK(:%New," IS NOT NULL AND") */
+      
+      NUMROWS = 0
+    )
+    THEN
+      raise_application_error(
+        -20002,
+        'Cannot insert Order_Record because Film does not exist.'
+      );
+    END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+CREATE  TRIGGER tU_Order_Record AFTER UPDATE ON Order_Record for each row
+-- erwin Builtin Trigger
+-- UPDATE trigger on Order_Record 
+DECLARE NUMROWS INTEGER;
+BEGIN
+  /* erwin Builtin Trigger */
+  /* Customer  Order_Record on child update restrict */
+  /* ERWIN_RELATION:CHECKSUM="0001f38c", PARENT_OWNER="", PARENT_TABLE="Customer"
+    CHILD_OWNER="", CHILD_TABLE="Order_Record"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="places", FK_COLUMNS="customer_id" */
+  SELECT count(*) INTO NUMROWS
+    FROM Customer
+    WHERE
+      /* %JoinFKPK(:%New,Customer," = "," AND") */
+      :new.customer_id = Customer.customer_id;
+  IF (
+    /* %NotnullFK(:%New," IS NOT NULL AND") */
+    
+    NUMROWS = 0
+  )
+  THEN
+    raise_application_error(
+      -20007,
+      'Cannot update Order_Record because Customer does not exist.'
+    );
+  END IF;
+
+  /* erwin Builtin Trigger */
+  /* Film  Order_Record on child update restrict */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Order_Record"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_required_by", FK_COLUMNS="film_id" */
+  SELECT count(*) INTO NUMROWS
+    FROM Film
+    WHERE
+      /* %JoinFKPK(:%New,Film," = "," AND") */
+      :new.film_id = Film.film_id;
+  IF (
+    /* %NotnullFK(:%New," IS NOT NULL AND") */
+    
+    NUMROWS = 0
+  )
+  THEN
+    raise_application_error(
+      -20007,
+      'Cannot update Order_Record because Film does not exist.'
+    );
+  END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+
+CREATE  TRIGGER tI_Customer_Rating BEFORE INSERT ON Customer_Rating for each row
+-- erwin Builtin Trigger
+-- INSERT trigger on Customer_Rating 
+DECLARE NUMROWS INTEGER;
+BEGIN
+    /* erwin Builtin Trigger */
+    /* Film  Customer_Rating on child insert restrict */
+    /* ERWIN_RELATION:CHECKSUM="0000eba3", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Customer_Rating"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_rated", FK_COLUMNS="film_id" */
+    SELECT count(*) INTO NUMROWS
+      FROM Film
+      WHERE
+        /* %JoinFKPK(:%New,Film," = "," AND") */
+        :new.film_id = Film.film_id;
+    IF (
+      /* %NotnullFK(:%New," IS NOT NULL AND") */
+      
+      NUMROWS = 0
+    )
+    THEN
+      raise_application_error(
+        -20002,
+        'Cannot insert Customer_Rating because Film does not exist.'
+      );
+    END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+CREATE  TRIGGER tU_Customer_Rating AFTER UPDATE ON Customer_Rating for each row
+-- erwin Builtin Trigger
+-- UPDATE trigger on Customer_Rating 
+DECLARE NUMROWS INTEGER;
+BEGIN
+  /* erwin Builtin Trigger */
+  /* Film  Customer_Rating on child update restrict */
+  /* ERWIN_RELATION:CHECKSUM="0000ee7a", PARENT_OWNER="", PARENT_TABLE="Film"
+    CHILD_OWNER="", CHILD_TABLE="Customer_Rating"
+    P2C_VERB_PHRASE="", C2P_VERB_PHRASE="", 
+    FK_CONSTRAINT="is_rated", FK_COLUMNS="film_id" */
+  SELECT count(*) INTO NUMROWS
+    FROM Film
+    WHERE
+      /* %JoinFKPK(:%New,Film," = "," AND") */
+      :new.film_id = Film.film_id;
+  IF (
+    /* %NotnullFK(:%New," IS NOT NULL AND") */
+    
+    NUMROWS = 0
+  )
+  THEN
+    raise_application_error(
+      -20007,
+      'Cannot update Customer_Rating because Film does not exist.'
+    );
+  END IF;
+
+
+-- erwin Builtin Trigger
+END;
+/
+
+
+
+    declare price number(10,2); begin     select price_per_day     into price     from T_EXEMPLAR     where T_EXEMPLAR.exemplar_id = :new.exemplar_id;     :new.total_price := Price_Type((:new.end_date-:new.start_date)*price); end;
+/
+
+
+
+ALTER TRIGGER tri_BORROWING
+	ENABLE;
+
+
+declare     price number(10,2);     total_price_old number(10,2);     end_d date;     start_d date; begin     select e.price_per_day     into price     from T_EXEMPLAR e     where e.exemplar_id = :new.exemplar_id;     total_price_old := :new.total_price.price;     end_d := :new.end_date;     start_d := :new.start_date;     if (total_price_old is null) then         total_price_old := 0;     end if;     if ((end_d-start_d)*price != total_price_old) then         :new.total_price := Price_Type((end_d-start_d)*price);     end if; end;
+/
+
+
+
+ALTER TRIGGER tru_BORROWING
+	ENABLE;
