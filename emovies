@@ -1,0 +1,340 @@
+
+CREATE TYPE [standard_string]
+	FROM VARCHAR(20) NULL
+go
+
+CREATE TYPE [standard_number]
+	FROM INTEGER NULL
+go
+
+CREATE TYPE [first_name]
+	FROM VARCHAR(20) NULL
+go
+
+CREATE TYPE [last_name]
+	FROM VARCHAR(20) NULL
+go
+
+CREATE TYPE [address]
+	FROM VARCHAR(20) NULL
+go
+
+CREATE TYPE [director]
+	FROM VARCHAR(20) NULL
+go
+
+CREATE TYPE [city]
+	FROM VARCHAR(20) NULL
+go
+
+CREATE TYPE [manager]
+	FROM VARCHAR(20) NULL
+go
+
+CREATE TYPE [state]
+	FROM VARCHAR(20) NULL
+go
+
+CREATE TYPE [title]
+	FROM VARCHAR(20) NULL
+go
+
+CREATE TYPE [zip_code]
+	FROM INTEGER NULL
+go
+
+CREATE TYPE [phone]
+	FROM INTEGER NULL
+go
+
+CREATE TYPE [address_2]
+	FROM VARCHAR(20) NULL
+go
+
+CREATE RULE [Movie_genre]
+	AS @col IN ('AA', 'AN', 'CO', 'DO', 'DR', 'FA', 'CL', 'HO', 'MY', 'SF', 'WS')
+go
+
+CREATE TABLE [PAYMENT]
+( 
+	[payment_transaction_number] integer  NOT NULL ,
+	[payment_type]       char(18)  NULL ,
+	[payment_amount]     numeric  NULL ,
+	[payment_date]       datetime  NULL ,
+	[payment_status]     varchar(1)  NULL ,
+	[EMP_number]         varchar(20)  NOT NULL ,
+	[CUST_number]        integer  NULL ,
+	[customer_no]        integer  NULL ,
+	[check_bank_number]  integer  NULL ,
+	[check_number]       integer  NULL ,
+	[epay_vendor_number] integer  NULL ,
+	[epay_account_number] integer  NULL ,
+	[credit_card_number] char(18)  NULL ,
+	[credit_card_exp]    datetime  NULL ,
+	[credit_card_type]   char(18)  NULL 
+)
+go
+
+ALTER TABLE [PAYMENT]
+	ADD CONSTRAINT [XPKPAYMENT] PRIMARY KEY  CLUSTERED ([payment_transaction_number] ASC)
+go
+
+
+ALTER TABLE [PAYMENT]
+	ADD CONSTRAINT [receives] FOREIGN KEY ([EMP_number]) REFERENCES [EMP]([EMP_number])
+		ON DELETE NO ACTION
+		ON UPDATE NO ACTION
+go
+
+ALTER TABLE [PAYMENT]
+	ADD CONSTRAINT [R_7_1] FOREIGN KEY ([customer_no]) REFERENCES [CUST]([CUST_number])
+		ON DELETE NO ACTION
+		ON UPDATE NO ACTION
+go
+
+ALTER TABLE [PAYMENT]
+	ADD CONSTRAINT [R_7_2] FOREIGN KEY ([CUST_number]) REFERENCES [CUST_CREDIT]([CUST_number])
+		ON DELETE NO ACTION
+		ON UPDATE NO ACTION
+go
+
+
+CREATE TRIGGER tD_PAYMENT ON PAYMENT FOR DELETE AS
+/* erwin Builtin Trigger */
+/* DELETE trigger on PAYMENT */
+BEGIN
+  DECLARE  @errno   int,
+           @severity int,
+           @state    int,
+           @errmsg  varchar(255)
+    /* erwin Builtin Trigger */
+    /* PAYMENT is made on MO_RENT_REC on parent delete no action */
+    /* ERWIN_RELATION:CHECKSUM="0004aeff", PARENT_OWNER="", PARENT_TABLE="PAYMENT"
+    CHILD_OWNER="", CHILD_TABLE="MO_RENT_REC"
+    P2C_VERB_PHRASE="is made on", C2P_VERB_PHRASE="requires", 
+    FK_CONSTRAINT="is_made_on", FK_COLUMNS="payment_transaction_number" */
+    IF EXISTS (
+      SELECT * FROM deleted,MO_RENT_REC
+      WHERE
+        /*  %JoinFKPK(MO_RENT_REC,deleted," = "," AND") */
+        MO_RENT_REC.payment_transaction_number = deleted.payment_transaction_number
+    )
+    BEGIN
+      SELECT @errno  = 30001,
+             @errmsg = 'Cannot delete PAYMENT because MO_RENT_REC exists.'
+      GOTO error
+    END
+
+    /* erwin Builtin Trigger */
+    /* CUST_CREDIT makes PAYMENT on child delete no action */
+    /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="CUST_CREDIT"
+    CHILD_OWNER="", CHILD_TABLE="PAYMENT"
+    P2C_VERB_PHRASE="makes", C2P_VERB_PHRASE="is made by", 
+    FK_CONSTRAINT="R_7_2", FK_COLUMNS="CUST_number" */
+    IF EXISTS (SELECT * FROM deleted,CUST_CREDIT
+      WHERE
+        /* %JoinFKPK(deleted,CUST_CREDIT," = "," AND") */
+        deleted.CUST_number = CUST_CREDIT.CUST_number AND
+        NOT EXISTS (
+          SELECT * FROM PAYMENT
+          WHERE
+            /* %JoinFKPK(PAYMENT,CUST_CREDIT," = "," AND") */
+            PAYMENT.CUST_number = CUST_CREDIT.CUST_number
+        )
+    )
+    BEGIN
+      SELECT @errno  = 30010,
+             @errmsg = 'Cannot delete last PAYMENT because CUST_CREDIT exists.'
+      GOTO error
+    END
+
+    /* erwin Builtin Trigger */
+    /* CUST makes PAYMENT on child delete no action */
+    /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="CUST"
+    CHILD_OWNER="", CHILD_TABLE="PAYMENT"
+    P2C_VERB_PHRASE="makes", C2P_VERB_PHRASE="is made by", 
+    FK_CONSTRAINT="R_7_1", FK_COLUMNS="customer_no" */
+    IF EXISTS (SELECT * FROM deleted,CUST
+      WHERE
+        /* %JoinFKPK(deleted,CUST," = "," AND") */
+        deleted.customer_no = CUST.CUST_number AND
+        NOT EXISTS (
+          SELECT * FROM PAYMENT
+          WHERE
+            /* %JoinFKPK(PAYMENT,CUST," = "," AND") */
+            PAYMENT.customer_no = CUST.CUST_number
+        )
+    )
+    BEGIN
+      SELECT @errno  = 30010,
+             @errmsg = 'Cannot delete last PAYMENT because CUST exists.'
+      GOTO error
+    END
+
+    /* erwin Builtin Trigger */
+    /* EMP receives PAYMENT on child delete no action */
+    /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="EMP"
+    CHILD_OWNER="", CHILD_TABLE="PAYMENT"
+    P2C_VERB_PHRASE="receives", C2P_VERB_PHRASE="is received by", 
+    FK_CONSTRAINT="receives", FK_COLUMNS="EMP_number" */
+    IF EXISTS (SELECT * FROM deleted,EMP
+      WHERE
+        /* %JoinFKPK(deleted,EMP," = "," AND") */
+        deleted.EMP_number = EMP.EMP_number AND
+        NOT EXISTS (
+          SELECT * FROM PAYMENT
+          WHERE
+            /* %JoinFKPK(PAYMENT,EMP," = "," AND") */
+            PAYMENT.EMP_number = EMP.EMP_number
+        )
+    )
+    BEGIN
+      SELECT @errno  = 30010,
+             @errmsg = 'Cannot delete last PAYMENT because EMP exists.'
+      GOTO error
+    END
+
+
+    /* erwin Builtin Trigger */
+    RETURN
+error:
+   RAISERROR (@errmsg, -- Message text.
+              @severity, -- Severity (0~25).
+              @state) -- State (0~255).
+    rollback transaction
+END
+
+go
+
+
+CREATE TRIGGER tU_PAYMENT ON PAYMENT FOR UPDATE AS
+/* erwin Builtin Trigger */
+/* UPDATE trigger on PAYMENT */
+BEGIN
+  DECLARE  @numrows int,
+           @nullcnt int,
+           @validcnt int,
+           @inspayment_transaction_number integer,
+           @errno   int,
+           @severity int,
+           @state    int,
+           @errmsg  varchar(255)
+
+  SELECT @numrows = @@rowcount
+  /* erwin Builtin Trigger */
+  /* PAYMENT is made on MO_RENT_REC on parent update no action */
+  /* ERWIN_RELATION:CHECKSUM="0005bedd", PARENT_OWNER="", PARENT_TABLE="PAYMENT"
+    CHILD_OWNER="", CHILD_TABLE="MO_RENT_REC"
+    P2C_VERB_PHRASE="is made on", C2P_VERB_PHRASE="requires", 
+    FK_CONSTRAINT="is_made_on", FK_COLUMNS="payment_transaction_number" */
+  IF
+    /* %ParentPK(" OR",UPDATE) */
+    UPDATE(payment_transaction_number)
+  BEGIN
+    IF EXISTS (
+      SELECT * FROM deleted,MO_RENT_REC
+      WHERE
+        /*  %JoinFKPK(MO_RENT_REC,deleted," = "," AND") */
+        MO_RENT_REC.payment_transaction_number = deleted.payment_transaction_number
+    )
+    BEGIN
+      SELECT @errno  = 30005,
+             @errmsg = 'Cannot update PAYMENT because MO_RENT_REC exists.'
+      GOTO error
+    END
+  END
+
+  /* erwin Builtin Trigger */
+  /* CUST_CREDIT makes PAYMENT on child update no action */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="CUST_CREDIT"
+    CHILD_OWNER="", CHILD_TABLE="PAYMENT"
+    P2C_VERB_PHRASE="makes", C2P_VERB_PHRASE="is made by", 
+    FK_CONSTRAINT="R_7_2", FK_COLUMNS="CUST_number" */
+  IF
+    /* %ChildFK(" OR",UPDATE) */
+    UPDATE(CUST_number)
+  BEGIN
+    SELECT @nullcnt = 0
+    SELECT @validcnt = count(*)
+      FROM inserted,CUST_CREDIT
+        WHERE
+          /* %JoinFKPK(inserted,CUST_CREDIT) */
+          inserted.CUST_number = CUST_CREDIT.CUST_number
+    /* %NotnullFK(inserted," IS NULL","select @nullcnt = count(*) from inserted where"," AND") */
+    select @nullcnt = count(*) from inserted where
+      inserted.CUST_number IS NULL
+    IF @validcnt + @nullcnt != @numrows
+    BEGIN
+      SELECT @errno  = 30007,
+             @errmsg = 'Cannot update PAYMENT because CUST_CREDIT does not exist.'
+      GOTO error
+    END
+  END
+
+  /* erwin Builtin Trigger */
+  /* CUST makes PAYMENT on child update no action */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="CUST"
+    CHILD_OWNER="", CHILD_TABLE="PAYMENT"
+    P2C_VERB_PHRASE="makes", C2P_VERB_PHRASE="is made by", 
+    FK_CONSTRAINT="R_7_1", FK_COLUMNS="customer_no" */
+  IF
+    /* %ChildFK(" OR",UPDATE) */
+    UPDATE(customer_no)
+  BEGIN
+    SELECT @nullcnt = 0
+    SELECT @validcnt = count(*)
+      FROM inserted,CUST
+        WHERE
+          /* %JoinFKPK(inserted,CUST) */
+          inserted.customer_no = CUST.CUST_number
+    /* %NotnullFK(inserted," IS NULL","select @nullcnt = count(*) from inserted where"," AND") */
+    select @nullcnt = count(*) from inserted where
+      inserted.customer_no IS NULL
+    IF @validcnt + @nullcnt != @numrows
+    BEGIN
+      SELECT @errno  = 30007,
+             @errmsg = 'Cannot update PAYMENT because CUST does not exist.'
+      GOTO error
+    END
+  END
+
+  /* erwin Builtin Trigger */
+  /* EMP receives PAYMENT on child update no action */
+  /* ERWIN_RELATION:CHECKSUM="00000000", PARENT_OWNER="", PARENT_TABLE="EMP"
+    CHILD_OWNER="", CHILD_TABLE="PAYMENT"
+    P2C_VERB_PHRASE="receives", C2P_VERB_PHRASE="is received by", 
+    FK_CONSTRAINT="receives", FK_COLUMNS="EMP_number" */
+  IF
+    /* %ChildFK(" OR",UPDATE) */
+    UPDATE(EMP_number)
+  BEGIN
+    SELECT @nullcnt = 0
+    SELECT @validcnt = count(*)
+      FROM inserted,EMP
+        WHERE
+          /* %JoinFKPK(inserted,EMP) */
+          inserted.EMP_number = EMP.EMP_number
+    /* %NotnullFK(inserted," IS NULL","select @nullcnt = count(*) from inserted where"," AND") */
+    select @nullcnt = count(*) from inserted where
+      inserted.EMP_number IS NULL
+    IF @validcnt + @nullcnt != @numrows
+    BEGIN
+      SELECT @errno  = 30007,
+             @errmsg = 'Cannot update PAYMENT because EMP does not exist.'
+      GOTO error
+    END
+  END
+
+
+  /* erwin Builtin Trigger */
+  RETURN
+error:
+   RAISERROR (@errmsg, -- Message text.
+              @severity, -- Severity (0~25).
+              @state) -- State (0~255).
+    rollback transaction
+END
+
+go
+
+
