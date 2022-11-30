@@ -338,3 +338,7 @@ END
 go
 
 
+
+
+execute sp_rename 'PAYMENT.payment_amount', 'payment_amount_1', 'COLUMN'
+go
