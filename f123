@@ -1,0 +1,12 @@
+
+CREATE TABLE [tab1]
+( 
+	[q]                  char(18)  NOT NULL ,
+	[w]                  char(18)  NULL ,
+	[r]                  char(18)  NULL 
+)
+go
+
+ALTER TABLE [tab1]
+	ADD CONSTRAINT [XPKtab1] PRIMARY KEY  CLUSTERED ([q] ASC)
+go
