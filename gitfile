@@ -1,0 +1,18 @@
+
+CREATE TABLE E_2
+(
+	q CHAR(18) NOT NULL ,
+	dd CHAR(18) NULL 
+);
+
+CREATE TABLE Test_bitbucket
+(
+	w CHAR(18) NOT NULL ,
+	d CHAR(18) NULL 
+);
+
+ALTER TABLE E_2
+	ADD CONSTRAINT XPKE_2 PRIMARY KEY (q);
+
+ALTER TABLE Test_bitbucket
+	ADD CONSTRAINT XPKTest_bitbucket PRIMARY KEY (w);
